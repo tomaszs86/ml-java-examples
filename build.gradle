@@ -4,6 +4,11 @@ import com.marklogic.client.DatabaseClientFactory.BasicAuthContext;
 
 import com.marklogic.client.document.TextDocumentManager;
 import com.marklogic.client.io.StringHandle;
+import com.marklogic.client.io.InputStreamHandle;
+
+import java.io.FileInputStream;
+import org.w3c.dom.Document;
+import com.marklogic.client.io.DOMHandle;
 
 plugins { 
     id "java"
@@ -19,26 +24,92 @@ dependencies {
     compile group: 'com.marklogic', name: 'marklogic-client-api', version: '4.0.3'
 }
 
+/*
+    Write text file
+*/
 task writeFile() {
     doLast {      
-      def host = mlHost
-      def port = mlRestPort.toInteger()
-      def username = mlUsername
-      def password = mlPassword
-
-      
-      def context = new com.marklogic.client.DatabaseClientFactory.BasicAuthContext(username, password)
-      def client = com.marklogic.client.DatabaseClientFactory.newClient(host, port, context)      
+      def context = new com.marklogic.client.DatabaseClientFactory.BasicAuthContext(mlUsername, mlPassword)
+      def client = com.marklogic.client.DatabaseClientFactory.newClient(mlHost, mlRestPort.toInteger(), context)      
       try {
           def textDocumentManager = client.newTextDocumentManager();
           String doc = "/test.txt";
           StringHandle handle = new StringHandle();
           handle.set("A simple text document");
-          textDocumentManager.write(doc, handle);        
+          textDocumentManager.write(doc, handle);     
+          textDocumentManager.delete(doc);
+          println "created"
       } catch(Exception e) {
         println e.printStackTrace()
       } finally {
         client.release()
+      }
+    }
+}
+
+/*
+    Write xml
+*/
+task writeXML() {
+    doLast {      
+      def context = new com.marklogic.client.DatabaseClientFactory.BasicAuthContext(mlUsername, mlPassword)
+      def client = com.marklogic.client.DatabaseClientFactory.newClient(mlHost, mlRestPort.toInteger(), context)      
+      try {
+          def docStream =   new FileInputStream("$projectDir/resources/flipper.xml");
+          if (docStream == null)
+            throw new IOException("Could not read document example");                    
+          def xmlManager = client.newXMLDocumentManager();
+          String doc = "/flipper.xml";
+          
+          xmlManager.writeAs(doc, docStream);
+          xmlManager.delete(doc)
+
+          //InputStreamHandle handle = new InputStreamHandle();
+          //handle.set(docStream);
+          //xmlManager.write(doc, handle);
+
+      } catch(Exception e) {
+        println e.printStackTrace()
+      } finally {
+        client.release()
+        docStream.close()
+      }
+    }
+}
+
+/*
+    Read xml
+*/
+task readXml() {
+    doLast {      
+      def context = new com.marklogic.client.DatabaseClientFactory.BasicAuthContext(mlUsername, mlPassword)
+      def client = com.marklogic.client.DatabaseClientFactory.newClient(mlHost, mlRestPort.toInteger(), context)      
+      try {
+          def docStream =   new FileInputStream("$projectDir/resources/flipper.xml");
+          if (docStream == null)
+            throw new IOException("Could not read document example");                    
+          def xmlManager = client.newXMLDocumentManager();
+          String doc = "/flipper.xml";
+          
+          xmlManager.writeAs(doc, docStream);
+         
+         DOMHandle handle = new DOMHandle();
+         xmlManager.read(doc, handle);
+         Document document = handle.get();
+
+          //Document document = xmlManager.readAs(doc, Document.class); 
+          
+          String rootName = document.getDocumentElement().getTagName();
+          String productName = handle.evaluateXPath("string(/product/name)", String.class);
+
+          println rootName
+          println productName
+
+      } catch(Exception e) {
+        println e.printStackTrace()
+      } finally {
+        client.release()
+        docStream.close()
       }
     }
 }
