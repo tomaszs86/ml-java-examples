@@ -10,6 +10,15 @@ import java.io.FileInputStream;
 import org.w3c.dom.Document;
 import com.marklogic.client.io.DOMHandle;
 
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+
+import com.marklogic.client.ext.modulesloader.ssl.SimpleX509TrustManager
+
 plugins { 
     id "java"
     id "com.marklogic.ml-gradle" version "3.0.0" 
@@ -114,4 +123,33 @@ task readXml() {
     }
 }
 
+/*
+    SSL with basic authentication
+*/
+task sslTest() {
+    doLast {      
+      
+      def sslContext = SSLContext.getInstance("TLSv1.2")
+      sslContext.init(null, [new SimpleX509TrustManager()] as TrustManager[], null)
 
+      def context = new com.marklogic.client.DatabaseClientFactory.BasicAuthContext(mlUsername, mlPassword).withSSLContext(sslContext);
+
+      def client = com.marklogic.client.DatabaseClientFactory.newClient("hostname", mlRestPort.toInteger(), context)      
+      try {          
+          def docStream =   new FileInputStream("$projectDir/resources/flipper.xml");
+          if (docStream == null)
+            throw new IOException("Could not read document example");                    
+          def xmlManager = client.newXMLDocumentManager();
+          String doc = "/flipper.xml";
+          
+          xmlManager.writeAs(doc, docStream);
+          xmlManager.delete(doc)
+
+      } catch(Exception e) {
+        println e.printStackTrace()
+      } finally {
+        client.release()
+        docStream.close()
+      }
+    }
+}
